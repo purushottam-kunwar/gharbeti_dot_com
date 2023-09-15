@@ -1,0 +1,5 @@
+nginx
+.env.example
+.git
+Dockerfile
+docker-compose.yml
