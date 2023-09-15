@@ -3,52 +3,135 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Address;
 use App\Models\Role;
 use App\Models\RoleUser;
 use App\Models\User;
+use App\Models\UserProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Exception;
 
 class LoginController extends Controller
 {
     public function register(Request $request): JsonResponse
     {
-        $validatedData = $request->validate([
-            'name' => 'required',
-            'email' => ['required', 'email'],
-            'password' => ['required', 'min:8', 'confirmed'],
-            'role' => ['required'],
-        ]);
+        try {
+            DB::beginTransaction();
 
-        $role = Role::find($validatedData['role']);
-        $userData = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => $request->password,
-            'role' => $request->role,
-        ];
+            $validatedData = $request->validate([
+                'name' => 'required|string',
+                'email' => ['required', 'email'],
+                'password' => ['required', 'min:8', 'confirmed'],
+                'bio' => 'nullable',
+                'date_of_birth' => 'required|string',
+                'gender' => 'required|string',
+                'contact_info' => 'nullable|string',
+                'province' => 'required|string',
+                'district' => 'required|string',
+                'local_body' => 'required|string',
+                'ward_no' => 'required|string',
+                'tole_or_village' => 'nullable|string',
+                'house_no' => 'nullable|string',
+                'role' => ['required'],
+            ]);
 
-        if ($role) {
-            $user = User::create($userData);
-            if ($user) {
-                RoleUser::create([
-                    'user_id' => $user->id,
-                    'role_id' => $role->id,
-                ]);
+            $role = Role::find($validatedData['role']);
+            $userData = [
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => $request->password,
+            ];
 
-                return response()->json([
-                    'user' => $user,
-                    'message' => "User Created Successfully",
-                ], 200);
+            if (isset($role['id'])) {
+                $user = User::create($userData);
+                if (isset($user['id'])) {
+
+                    // create role user
+                    $roleUserParams = [
+                        'user_id' => $user->id,
+                        'role_id' => $role->id,
+                    ];
+
+                    $roleUser = RoleUser::create($roleUserParams);
+                    if (isset($roleUser['id'])) {
+
+                        // create user address
+                        $addressParams = [
+                            'province' => $request->province,
+                            'district' => $request->district,
+                            'local_body' => $request->local_body,
+                            'tole_or_village' => $request->tole_or_village,
+                            'ward_no' => $request->ward_no,
+                            'house_no' => $request->house_no,
+                            'remarks' => $request->remarks,
+                            'user_id' => $user->id,
+                        ];
+
+                        $address = Address::create($addressParams);
+
+                        if (isset($address['id'])) {
+
+                            // create user_profile
+                            $userProfileParams = [
+                                'bio' => $request->bio,
+                                'date_of_birth' => $request->date_of_birth,
+                                'gender' => $request->gender,
+                                'contact_info' => $request->contact_info,
+                                'status' => $request->status,
+                                'role_id' => $role->id,
+                                'user_id' => $user->id,
+                                'address_id' => $address->id,
+                            ];
+
+                            $userProfile = UserProfile::create($userProfileParams);
+                            if (isset($userProfile['id'])) {
+                                DB::commit();
+                                $response["code"] = 200;
+                                $response["status"] = "success";
+                                $response["message"] = 'User Created Successfully';
+                                $response["data"] = $userProfile;
+                            } else {
+                                DB::rollBack();
+                                $response["code"] = 400;
+                                $response["status"] = "error";
+                                $response["message"] = "Failed to create user profile";
+                            }
+                        } else {
+                            DB::rollBack();
+                            $response["code"] = 400;
+                            $response["status"] = "error";
+                            $response["message"] = "Failed to create address";
+                        }
+
+                    } else {
+                        DB::rollBack();
+                        $response["code"] = 400;
+                        $response["status"] = "error";
+                        $response["message"] = "Failed to create role user";
+                    }
+                } else {
+                    DB::rollBack();
+                    $response["code"] = 400;
+                    $response["status"] = "error";
+                    $response["message"] = "Failed to create user";
+                }
             } else {
-                return response()->json(['error' => 'User Could not be created'], 401);
+                DB::rollBack();
+                $response["code"] = 400;
+                $response["status"] = "error";
+                $response["message"] = "Role can not find";
             }
-        } else {
-            return response()->json(['error' => 'Invalid role'], 404);
+        } catch (Exception $error) {
+            DB::rollBack();
+            $response["code"] = 400;
+            $response["status"] = "error";
+            $response["message"] = $error->getMessage() . "=====" . $error->getLine();
         }
-
+        return response()->json($response, $response["code"]);
     }
 
     public function login(Request $request): JsonResponse
