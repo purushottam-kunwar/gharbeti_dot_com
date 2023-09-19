@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::post('/login', [LoginController::class, 'login']);
+Route::post('/register', [LoginController::class, 'register']);
 
 Route::middleware(['auth:api'])->group(function () {
     // User
@@ -30,7 +31,6 @@ Route::middleware(['auth:api'])->group(function () {
 
 Route::middleware(['auth:api', 'role:super_admin'])->group(function () {
     // User
-    Route::post('/register', [LoginController::class, 'register']);
     Route::get('/list-users', [UserController::class, 'listUsers']);
 
 });

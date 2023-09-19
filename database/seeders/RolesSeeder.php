@@ -15,8 +15,8 @@ class RolesSeeder extends Seeder
         $roles = [
             ['name' => 'super_admin'],
             ['name' => 'admin'],
-            ['name' => 'gharbeti'],
-            ['name' => 'user'],
+            ['name' => 'household'],
+            ['name' => 'renter'],
         ];
         foreach ($roles as $role) {
             $roleData = Role::where('name', $role['name'])->first();
